@@ -20,4 +20,3 @@ fun main() {
     println("------")
     rows.forEach { println(it) }
 }
-

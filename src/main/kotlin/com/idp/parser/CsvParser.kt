@@ -8,28 +8,23 @@ import com.idp.model.State
 import java.io.File
 import java.time.LocalDate
 
-/*
- * seqF lambda must only apply non-terminal sequence steps
- */
-inline fun <reified T : Data, R> CsvReader.read(file: File, crossinline seqF: Sequence<T>.() -> Sequence<R>): List<R> {
-    val header = open(file) { readAllAsSequence().first() }
-
-    val mapper: (List<String>) -> T = when (T::class) {
-        State::class -> { line -> line.toState(header) as T }
-        County::class -> { line -> line.toCounty(header) as T }
-        National::class -> { line -> line.toNational(header) as T }
-        else -> TODO() /* This can never be reached, when should be exhaustive */
-    }
-
-    return open(file) {
+inline fun <reified T : Data, R> CsvReader.read(file: File, crossinline seqF: Sequence<T>.() -> Sequence<R>): List<R> =
+    open(file) {
+        val header = readAllAsSequence().first()
         readAllAsSequence()
             .drop(1)
             .filter { !it.contains("") }
-            .map(mapper)
+            .map { it.toData<T>(header) }
             .seqF()
             .toList()
     }
-}
+
+inline fun <reified T> List<String>.toData(header: List<String>): T = when (T::class) {
+    State::class -> toState(header)
+    County::class -> toCounty(header)
+    National::class -> toNational(header)
+    else -> TODO()
+} as T
 
 fun List<String>.toNational(header: List<String>): National = National(
     date = LocalDate.parse(this[header.indexOf("date")]),
