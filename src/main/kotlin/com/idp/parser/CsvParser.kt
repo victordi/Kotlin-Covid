@@ -10,42 +10,39 @@ import java.time.LocalDate
 
 inline fun <reified T : Data, R> CsvReader.read(file: File, crossinline seqF: Sequence<T>.() -> Sequence<R>): List<R> =
     open(file) {
-        val header = readAllAsSequence().first()
-        readAllAsSequence()
-            .drop(1)
-            .filter { !it.contains("") }
-            .map { it.toData<T>(header) }
+        readAllWithHeaderAsSequence()
+            .filter { !it.containsValue("") }
+            .map { it.toData<T>() }
             .seqF()
             .toList()
     }
 
-inline fun <reified T> List<String>.toData(header: List<String>): T = when (T::class) {
-    State::class -> toState(header)
-    County::class -> toCounty(header)
-    National::class -> toNational(header)
-    else -> TODO()
+inline fun <reified T> Map<String, String>.toData(): T = when (T::class) {
+    State::class    -> toState()
+    County::class   -> toCounty()
+    National::class -> toNational()
+    else            -> TODO()
 } as T
 
-fun List<String>.toNational(header: List<String>): National = National(
-    date = LocalDate.parse(this[header.indexOf("date")]),
-    cases = this[header.indexOf("cases")].toInt(),
-    deaths = this[header.indexOf("deaths")].toInt()
+fun Map<String, String>.toNational(): National = National(
+    date   = LocalDate.parse(get("date") ?: "1900-01-01"),
+    cases  = get("cases")?.toInt() ?: -1,
+    deaths = get("deaths")?.toInt() ?: -1
 )
 
-fun List<String>.toState(header: List<String>): State = State(
-    date = LocalDate.parse(this[header.indexOf("date")]),
-    cases = this[header.indexOf("cases")].toInt(),
-    deaths = this[header.indexOf("deaths")].toInt(),
-    state = this[header.indexOf("state")],
-    fips = this[header.indexOf("fips")].toInt()
+fun Map<String, String>.toState(): State = State(
+    date   = LocalDate.parse(get("date") ?: "1900-01-01"),
+    cases  = get("cases")?.toInt() ?: -1,
+    deaths = get("deaths")?.toInt() ?: -1,
+    state  = get("state") ?: "",
+    fips   = get("fips")?.toInt() ?: -1
 )
 
-
-fun List<String>.toCounty(header: List<String>): County = County(
-    date = LocalDate.parse(this[header.indexOf("date")]),
-    cases = this[header.indexOf("cases")].toInt(),
-    deaths = this[header.indexOf("deaths")].toInt(),
-    state = this[header.indexOf("state")],
-    fips = this[header.indexOf("fips")].toInt(),
-    county = this[header.indexOf("county")]
+fun Map<String, String>.toCounty(): County = County(
+    date   = LocalDate.parse(get("date") ?: "1900-01-01"),
+    cases  = get("cases")?.toInt() ?: -1,
+    deaths = get("deaths")?.toInt() ?: -1,
+    state  = get("state") ?: "",
+    fips   = get("fips")?.toInt() ?: -1,
+    county = get("county") ?: ""
 )
