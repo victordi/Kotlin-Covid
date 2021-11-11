@@ -9,6 +9,7 @@ repositories {
 dependencies {
     implementation("com.github.doyaaaaaken:kotlin-csv-jvm:1.2.0")
     implementation("org.slf4j:slf4j-log4j12:1.7.29")
+    implementation("org.jetbrains.kotlin:kotlin-reflect:1.5.31")
 
     testImplementation("io.kotest:kotest-runner-junit5-jvm:4.4.3")
 }
