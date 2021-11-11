@@ -5,7 +5,6 @@ import com.idp.model.County
 import com.idp.parser.read
 import java.io.File
 
-@OptIn(ExperimentalStdlibApi::class)
 fun main() {
     val filePath = {}::class.java.getResource("/us-counties.csv")?.file ?: ""
     csvReader().read<County, County>(File(filePath)) {
