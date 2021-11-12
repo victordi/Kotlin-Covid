@@ -8,6 +8,14 @@ import com.idp.model.State
 import java.io.File
 import java.time.LocalDate
 
+
+inline fun <reified T : Data> CsvReader.read(file: File): List<T> =
+    open(file) {
+        readAllWithHeaderAsSequence().runCatching {
+            mapNotNull { it.toData<T>() }.toList()
+        }.getOrDefault(emptyList())
+    }
+
 inline fun <reified T : Data, R> CsvReader.read(file: File, crossinline seqF: Sequence<T>.() -> Sequence<R>): List<R> =
     open(file) {
         readAllWithHeaderAsSequence().runCatching {
