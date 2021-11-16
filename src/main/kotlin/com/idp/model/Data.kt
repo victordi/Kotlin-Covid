@@ -59,8 +59,11 @@ private val logger = logger({}::class.java.name.takeWhile { it != '$' })
 
 suspend fun updateFiles() {
     downloadFile(Properties.nationalDownload, Properties.nationalFile)
+        .thenRun { Database.updateNational() }
     downloadFile(Properties.stateDownload, Properties.stateFile)
+        .thenRun { Database.updateState() }
     downloadFile(Properties.countyDownload, Properties.countyFile)
+        .thenRun { Database.updateCounty() }
 }
 
 private suspend fun downloadFile(source: String, destination: String) = withContext(Dispatchers.IO) {

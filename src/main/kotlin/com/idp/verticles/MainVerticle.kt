@@ -1,13 +1,12 @@
 package com.idp.verticles
 
-import com.github.doyaaaaaken.kotlincsv.dsl.csvReader
+import com.idp.model.State
 import com.idp.model.National
 import com.idp.model.County
-import com.idp.model.State
-import com.idp.model.Properties
 import com.idp.model.Data
 import com.idp.model.updateFiles
-import com.idp.parser.read
+import com.idp.model.Database
+import com.idp.model.Properties
 import io.vertx.ext.web.Route
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.RoutingContext
@@ -16,7 +15,6 @@ import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.kotlin.logger
-import java.io.File
 
 const val JSON = "application/json"
 const val ALL = Int.MAX_VALUE
@@ -33,6 +31,10 @@ class MainVerticle : CoroutineVerticle() {
             logger.info("Periodic update of the csv files")
             launch { updateFiles() }
         }
+
+        logger.info("Starting Database")
+        Database.init()
+        logger.info("Database initialized")
 
         logger.info("Starting HTTP server...")
         vertx.createHttpServer()
@@ -85,16 +87,14 @@ class MainVerticle : CoroutineVerticle() {
 
     private inline fun <reified T : Data> data(rc: RoutingContext, count: Int?) = runCatching {
         requireNotNull(count)
-        val file = File(
-            when (T::class) {
-                National::class -> Properties.nationalFile
-                State::class -> Properties.stateFile
-                County::class -> Properties.countyFile
-                else -> TODO()
-            }
-        )
+        val inputStream = when (T::class) {
+            National::class -> Database.nationalSequence
+            State::class -> Database.stateSequence
+            County::class -> Database.countySequence
+            else -> emptySequence()
+        }
 
-        val response = csvReader().read<T, T>(file) { take(count) }
+        val response = inputStream.take(count).toList()
 
         rc.response().setStatusCode(STATUS_OK)
             .putHeader("Content-Type", JSON)
