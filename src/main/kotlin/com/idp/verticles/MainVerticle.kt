@@ -15,6 +15,7 @@ import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.kotlin.logger
+import java.time.LocalDate
 
 const val JSON = "application/json"
 const val ALL = Int.MAX_VALUE
@@ -54,11 +55,17 @@ class MainVerticle : CoroutineVerticle() {
         router.get("/national")
             .handler { data<National>(it, ALL) }
 
+        router.get("/national/filters")
+            .handler { nationalFilters(it) }
+
         router.get("/national/:count")
             .handler { data<National>(it, it.pathParams()["count"]?.toIntOrNull()) }
 
         router.get("/state")
             .handler { data<State>(it, ALL) }
+
+        router.get("/state/filters")
+            .handler { stateFilters(it) }
 
         router.get("/state/:count")
             .handler { data<State>(it, it.pathParams()["count"]?.toIntOrNull()) }
@@ -66,8 +73,14 @@ class MainVerticle : CoroutineVerticle() {
         router.get("/county")
             .handler { data<County>(it, ALL) }
 
+        router.get("/county/filters")
+            .handler { countyFilters(it) }
+
         router.get("/county/:count")
             .handler { data<County>(it, it.pathParams()["count"]?.toIntOrNull()) }
+
+        router.get("/info/:name")
+            .handler { info(it) }
 
         router.get("/update")
             .coroutineHandler { update(it) }
@@ -83,6 +96,82 @@ class MainVerticle : CoroutineVerticle() {
                 it.fail(e)
             }
         }
+    }
+
+    private fun nationalFilters(rc: RoutingContext) = runCatching {
+        val queryParams = rc.queryParams()
+        require(!queryParams.isEmpty)
+        val startDate = LocalDate.parse(queryParams["startDate"] ?: LocalDate.MIN.toString())
+        val endDate = LocalDate.parse(queryParams["endDate"] ?: LocalDate.MAX.toString())
+
+        val response = Database.nationalSequence
+            .filter { it.date >= startDate && it.date <= endDate }
+            .toList()
+
+        rc.response().setStatusCode(STATUS_OK)
+            .putHeader("Content-Type", JSON)
+            .end(response.map { it.toJson() }.toString())
+    }.onFailure {
+        rc.response().setStatusCode(BAD_REQUEST)
+            .end("At least one filter must be provided")
+    }
+
+    private fun stateFilters(rc: RoutingContext) = runCatching {
+        val queryParams = rc.queryParams()
+        require(!queryParams.isEmpty)
+        val startDate = LocalDate.parse(queryParams["startDate"] ?: LocalDate.MIN.toString())
+        val endDate = LocalDate.parse(queryParams["endDate"] ?: LocalDate.MAX.toString())
+        val state = queryParams["state"] ?: ""
+
+        val response = Database.stateSequence
+            .filter { it.date >= startDate && it.date <= endDate }
+            .filter { state == "" || it.state == state }
+            .toList()
+
+        rc.response().setStatusCode(STATUS_OK)
+            .putHeader("Content-Type", JSON)
+            .end(response.map { it.toJson() }.toString())
+    }.onFailure {
+        rc.response().setStatusCode(BAD_REQUEST)
+            .end("At least one filter must be provided")
+    }
+
+    private fun countyFilters(rc: RoutingContext) = runCatching {
+        val queryParams = rc.queryParams()
+        require(!queryParams.isEmpty)
+        val startDate = LocalDate.parse(queryParams["startDate"] ?: LocalDate.MIN.toString())
+        val endDate = LocalDate.parse(queryParams["endDate"] ?: LocalDate.MAX.toString())
+        val county = queryParams["county"] ?: ""
+        val state = queryParams["state"] ?: ""
+
+        val response = Database.countySequence
+            .filter { it.date >= startDate && it.date <= endDate }
+            .filter { county == "" || it.county == county }
+            .filter { state == "" || it.state == state }
+            .toList()
+
+        rc.response().setStatusCode(STATUS_OK)
+            .putHeader("Content-Type", JSON)
+            .end(response.map { it.toJson() }.toString())
+    }.onFailure {
+        rc.response().setStatusCode(BAD_REQUEST)
+            .end("At least one filter must be provided")
+    }
+
+    private fun info(rc: RoutingContext) = runCatching {
+        val name = rc.pathParams()["name"]
+        requireNotNull(name)
+        val response = when(name) {
+            in Database.states -> Database.stateInfo(name)
+            in Database.counties -> Database.countyInfo(name)
+            else -> throw IllegalArgumentException("Provided path parameter is not a state or a county")
+        }
+        rc.response().setStatusCode(STATUS_OK)
+            .putHeader("Content-Type", JSON)
+            .end(response)
+    }.onFailure {
+        rc.response().setStatusCode(BAD_REQUEST)
+            .end(it.message)
     }
 
     private inline fun <reified T : Data> data(rc: RoutingContext, count: Int?) = runCatching {

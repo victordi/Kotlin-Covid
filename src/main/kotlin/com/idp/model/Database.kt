@@ -16,6 +16,15 @@ object Database {
         private set
     lateinit var countySequence: Sequence<County>
         private set
+    lateinit var states: Set<String>
+        private set
+    lateinit var counties: Set<String>
+        private set
+
+    private const val DAY = 1
+    private const val WEEK = 7
+    private const val MONTH = 30
+    private const val YEAR = 365
 
     suspend fun init() = withContext(Dispatchers.IO) {
         nationalSequence =
@@ -24,6 +33,9 @@ object Database {
             csvReader().read<State>(File(Properties.stateFile)).asSequence().sortedByDescending { it.date }
         countySequence =
             csvReader().read<County>(File(Properties.countyFile)).asSequence().sortedByDescending { it.date }
+
+        states = stateSequence.map { it.state }.toSet()
+        counties = countySequence.map { it.county }.toSet()
     }
 
     fun updateNational() {
@@ -54,5 +66,37 @@ object Database {
         countySequence = backup
 
         logger.info("Database update finished for County File")
+    }
+
+    fun stateInfo(state: String): String = getInfo(stateSequence.filter { it.state == state })
+
+    fun countyInfo(county: String): String = getInfo(countySequence.filter { it.county == county })
+
+    private fun getInfo(sequence: Sequence<Data>): String {
+        operator fun Data.minus(other: Data): Pair<Int, Int> =
+            this.cases - other.cases to this.deaths - other.deaths
+
+        val today = sequence.first()
+        val lastDay: Pair<Int, Int> = today - sequence.drop(DAY).first()
+        val lastWeek: Pair<Int, Int> = today - sequence.drop(WEEK).first()
+        val lastMonth: Pair<Int, Int> = today - sequence.drop(MONTH).first()
+        val lastYear: Pair<Int, Int> = today - sequence.drop(YEAR).first()
+
+        return """
+            {
+                "cases": {
+                    "yesterday": ${lastDay.first},
+                    "lastWeek": ${lastWeek.first},
+                    "lastMonth": ${lastMonth.first},
+                    "lastYear": ${lastYear.first}
+                },
+                "deaths": {
+                    "yesterday":${lastDay.second},
+                    "lastWeek":${lastWeek.second},
+                    "lastMonth":${lastMonth.second},
+                    "lastYear": ${lastYear.second}
+                }
+            }
+        """.trimIndent()
     }
 }

@@ -7,10 +7,14 @@ import java.io.File
 import java.time.LocalDate
 
 sealed interface Data {
+    val date: LocalDate
+    val cases: Int
+    val deaths: Int
+
     fun toJson(): String
 }
 
-data class National(val date: LocalDate, val cases: Int, val deaths: Int) : Data {
+data class National(override val date: LocalDate, override val cases: Int, override val deaths: Int) : Data {
     override fun toJson(): String =
         """
         {
@@ -21,7 +25,14 @@ data class National(val date: LocalDate, val cases: Int, val deaths: Int) : Data
     """.trimIndent()
 }
 
-data class State(val date: LocalDate, val state: String, val fips: Int, val cases: Int, val deaths: Int) : Data {
+data class State(
+    override val date: LocalDate,
+    val state: String,
+    val fips: Int,
+    override val cases: Int,
+    override val deaths: Int
+) :
+    Data {
     override fun toJson(): String =
         """
         {
@@ -35,12 +46,12 @@ data class State(val date: LocalDate, val state: String, val fips: Int, val case
 }
 
 data class County(
-    val date: LocalDate,
+    override val date: LocalDate,
     val county: String,
     val state: String,
     val fips: Int,
-    val cases: Int,
-    val deaths: Int
+    override val cases: Int,
+    override val deaths: Int
 ) : Data {
     override fun toJson(): String =
         """
