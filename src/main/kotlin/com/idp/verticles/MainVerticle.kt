@@ -18,6 +18,7 @@ import org.apache.logging.log4j.kotlin.logger
 import java.time.LocalDate
 
 const val JSON = "application/json"
+const val HTML = "text/html; charset=utf-8"
 const val ALL = Int.MAX_VALUE
 const val STATUS_OK = 200
 const val BAD_REQUEST = 400
@@ -81,6 +82,9 @@ class MainVerticle : CoroutineVerticle() {
 
         router.get("/info/:name")
             .handler { info(it) }
+
+        router.get("/graph/:name")
+            .handler { graph(it) }
 
         router.get("/update")
             .coroutineHandler { update(it) }
@@ -158,22 +162,6 @@ class MainVerticle : CoroutineVerticle() {
             .end("At least one filter must be provided")
     }
 
-    private fun info(rc: RoutingContext) = runCatching {
-        val name = rc.pathParams()["name"]
-        requireNotNull(name)
-        val response = when(name) {
-            in Database.states -> Database.stateInfo(name)
-            in Database.counties -> Database.countyInfo(name)
-            else -> throw IllegalArgumentException("Provided path parameter is not a state or a county")
-        }
-        rc.response().setStatusCode(STATUS_OK)
-            .putHeader("Content-Type", JSON)
-            .end(response)
-    }.onFailure {
-        rc.response().setStatusCode(BAD_REQUEST)
-            .end(it.message)
-    }
-
     private inline fun <reified T : Data> data(rc: RoutingContext, count: Int?) = runCatching {
         requireNotNull(count)
         val inputStream = when (T::class) {
@@ -191,6 +179,44 @@ class MainVerticle : CoroutineVerticle() {
     }.onFailure {
         rc.response().setStatusCode(BAD_REQUEST)
             .end("Provided path parameter is not an valid Integer value")
+    }
+
+    private fun info(rc: RoutingContext) = runCatching {
+        val name = rc.pathParams()["name"]
+        requireNotNull(name)
+        val response = when(name) {
+            "national" -> Database.nationalInfo()
+            in Database.states -> Database.stateInfo(name)
+            in Database.counties -> Database.countyInfo(name)
+            else -> throw IllegalArgumentException("Provided path parameter is not a state or a county")
+        }
+        rc.response().setStatusCode(STATUS_OK)
+            .putHeader("Content-Type", JSON)
+            .end(response)
+    }.onFailure {
+        rc.response().setStatusCode(BAD_REQUEST)
+            .end(it.message)
+    }
+
+    private fun graph(rc: RoutingContext) = runCatching {
+        val name = rc.pathParams()["name"]
+        requireNotNull(name)
+        val graphPoints = when(name) {
+            "national" -> Database.nationalGraph()
+            in Database.states -> Database.stateGraph(name)
+            in Database.counties -> Database.countyGraph(name)
+            else -> throw IllegalArgumentException("Provided path parameter is not a state or a county")
+        }
+
+        val response = {}::class.java.getResource("/graph.txt")!!.readText()
+            .replace("data-placeholder", graphPoints)
+
+        rc.response().setStatusCode(STATUS_OK)
+            .putHeader("Content-Type", HTML)
+            .end(response)
+    }.onFailure {
+        rc.response().setStatusCode(BAD_REQUEST)
+            .end(it.message)
     }
 
     private suspend fun update(rc: RoutingContext) {

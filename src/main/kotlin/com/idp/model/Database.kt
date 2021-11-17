@@ -68,6 +68,8 @@ object Database {
         logger.info("Database update finished for County File")
     }
 
+    fun nationalInfo(): String = getInfo(nationalSequence)
+
     fun stateInfo(state: String): String = getInfo(stateSequence.filter { it.state == state })
 
     fun countyInfo(county: String): String = getInfo(countySequence.filter { it.county == county })
@@ -99,4 +101,22 @@ object Database {
             }
         """.trimIndent()
     }
+
+    fun nationalGraph(): String = getWeeklyGraph(nationalSequence)
+
+    fun stateGraph(state: String): String = getWeeklyGraph(stateSequence.filter { it.state == state })
+
+    fun countyGraph(county: String): String = getWeeklyGraph(countySequence.filter { it.county == county })
+
+    private fun getWeeklyGraph(sequence: Sequence<Data>): String {
+        val weeklySequence = sequence.filterIndexed { index, _ -> index % 7 == 0 }
+        val dates = weeklySequence.map { it.date.toEpochDay() }.drop(1)
+        val percentages = weeklySequence.map { it.cases }.zipWithNext { a, b -> (a - b) / b.toDouble() }
+
+        fun List<Pair<Long, Double>>.asString(): String =
+            fold("") { acc, (date, percentage) -> "$acc[$date,  $percentage],\n" }
+
+        return dates.zip(percentages).toList().asString()
+    }
+
 }
