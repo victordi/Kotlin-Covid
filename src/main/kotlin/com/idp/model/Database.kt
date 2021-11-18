@@ -109,7 +109,7 @@ object Database {
     fun countyGraph(county: String): String = getWeeklyGraph(countySequence.filter { it.county == county })
 
     private fun getWeeklyGraph(sequence: Sequence<Data>): String {
-        val weeklySequence = sequence.filterIndexed { index, _ -> index % 7 == 0 }
+        val weeklySequence = sequence.filterIndexed { index, _ -> index % WEEK == 0 }
         val dates = weeklySequence.map { it.date.toEpochDay() }.drop(1)
         val percentages = weeklySequence.map { it.cases }.zipWithNext { a, b -> (a - b) / b.toDouble() }
 

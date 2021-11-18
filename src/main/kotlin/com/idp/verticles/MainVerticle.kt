@@ -1,20 +1,19 @@
 package com.idp.verticles
 
-import com.idp.model.State
-import com.idp.model.National
-import com.idp.model.County
-import com.idp.model.Data
-import com.idp.model.updateFiles
-import com.idp.model.Database
-import com.idp.model.Properties
+import com.idp.model.*
 import io.vertx.ext.web.Route
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.RoutingContext
+import io.vertx.ext.web.client.WebClient
 import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.dispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.kotlin.logger
+import java.io.File
 import java.time.LocalDate
 
 const val JSON = "application/json"
@@ -92,6 +91,7 @@ class MainVerticle : CoroutineVerticle() {
         return router
     }
 
+    @Suppress("TooGenericExceptionCaught")
     private fun Route.coroutineHandler(handler: suspend (RoutingContext) -> Unit) = handler {
         launch(it.vertx().dispatcher()) {
             try {
@@ -184,7 +184,7 @@ class MainVerticle : CoroutineVerticle() {
     private fun info(rc: RoutingContext) = runCatching {
         val name = rc.pathParams()["name"]
         requireNotNull(name)
-        val response = when(name) {
+        val response = when (name) {
             "national" -> Database.nationalInfo()
             in Database.states -> Database.stateInfo(name)
             in Database.counties -> Database.countyInfo(name)
@@ -201,7 +201,7 @@ class MainVerticle : CoroutineVerticle() {
     private fun graph(rc: RoutingContext) = runCatching {
         val name = rc.pathParams()["name"]
         requireNotNull(name)
-        val graphPoints = when(name) {
+        val graphPoints = when (name) {
             "national" -> Database.nationalGraph()
             in Database.states -> Database.stateGraph(name)
             in Database.counties -> Database.countyGraph(name)
@@ -224,4 +224,35 @@ class MainVerticle : CoroutineVerticle() {
         rc.response().setStatusCode(STATUS_OK)
             .end("Started the update of csv files")
     }
+
+    private suspend fun updateFiles() = coroutineScope {
+        launch {
+            downloadFile(Properties.nationalDownload, Properties.nationalFile) { Database.updateNational() }
+        }
+        launch {
+            downloadFile(Properties.stateDownload, Properties.stateFile) { Database.updateState() }
+        }
+        launch {
+            downloadFile(Properties.countyDownload, Properties.countyFile) { Database.updateCounty() }
+        }
+    }
+
+    private suspend fun downloadFile(source: String, destination: String, handler: () -> Unit) =
+        withContext(Dispatchers.IO) {
+            logger.info("Update triggered for the following file $destination")
+
+            val request = WebClient.create(vertx).getAbs(source)
+
+            request.send {
+                if (it.failed()) {
+                    logger.error("Could not update the following file: $destination \n${it.cause()}")
+                } else {
+                    File("$destination-backup").writeText(it.result().bodyAsString())
+                    File(destination).delete()
+                    File("$destination-backup").renameTo(File(destination))
+                    logger.info("Finished downloading $destination")
+                    handler.invoke()
+                }
+            }
+        }
 }
