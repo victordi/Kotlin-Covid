@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "1.5.31"
+    kotlin("jvm") version "1.6.0"
     id("io.gitlab.arturbosch.detekt") version "1.18.1"
 }
 
@@ -9,7 +9,7 @@ repositories {
 
 val vertxVersion   = "4.2.1"
 val log4jVersion   = "2.11.1"
-val kotlinVersion  = "1.5.31"
+val kotlinVersion  = "1.6.0"
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
